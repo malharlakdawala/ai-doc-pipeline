@@ -12,25 +12,31 @@ class Chunk:
 
 class TextChunker:
     def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+        if chunk_overlap >= chunk_size:
+            raise ValueError("chunk_overlap must be less than chunk_size")
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
     def chunk_text(self, text: str, metadata: dict | None = None) -> list[Chunk]:
+        if not text or not text.strip():
+            return []
+
         metadata = metadata or {}
         chunks = []
         start = 0
         chunk_idx = 0
 
         while start < len(text):
-            end = start + self.chunk_size
+            end = min(start + self.chunk_size, len(text))
 
             # Try to break at sentence boundary
             if end < len(text):
-                last_period = text.rfind(".", start, end)
-                last_newline = text.rfind("\n", start, end)
-                break_point = max(last_period, last_newline)
-                if break_point > start + self.chunk_size // 2:
-                    end = break_point + 1
+                # Look for sentence endings
+                for sep in [". ", "\n\n", "\n", " "]:
+                    last_sep = text.rfind(sep, start + self.chunk_size // 3, end)
+                    if last_sep > start:
+                        end = last_sep + len(sep)
+                        break
 
             chunk_text = text[start:end].strip()
             if chunk_text:
@@ -41,9 +47,10 @@ class TextChunker:
                 ))
                 chunk_idx += 1
 
-            start = end - self.chunk_overlap
-            if start >= len(text):
-                break
+            next_start = end - self.chunk_overlap
+            if next_start <= start:
+                next_start = end
+            start = next_start
 
         return chunks
 
