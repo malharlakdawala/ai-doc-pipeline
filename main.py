@@ -3,6 +3,7 @@
 import click
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from config import Config
 from ingester import Ingester
@@ -88,6 +89,28 @@ def chat():
         for chunk in generator.generate_streaming(question, context_str):
             console.print(chunk, end="")
         console.print()
+
+
+@cli.command()
+def stats():
+    """Show vector store statistics."""
+    store = VectorStore()
+    table = Table(title="Vector Store Stats")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+    table.add_row("Total chunks", str(store.count()))
+    table.add_row("Persist directory", Config.CHROMA_PERSIST_DIR)
+    table.add_row("Embedding model", Config.EMBEDDING_MODEL)
+    console.print(table)
+
+
+@cli.command()
+@click.confirmation_option(prompt="This will delete all stored data. Continue?")
+def reset():
+    """Reset the vector store."""
+    store = VectorStore()
+    store.reset()
+    console.print("[yellow]Vector store has been reset.[/yellow]")
 
 
 if __name__ == "__main__":
