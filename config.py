@@ -1,16 +1,21 @@
 """Configuration for ai-doc-pipeline."""
 
 import os
-from dotenv import load_dotenv
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
-load_dotenv()
+
+class Config(BaseSettings):
+    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
+    chroma_persist_dir: str = Field(default="./chroma_data", alias="CHROMA_PERSIST_DIR")
+    chunk_size: int = Field(default=1000, alias="CHUNK_SIZE")
+    chunk_overlap: int = Field(default=200, alias="CHUNK_OVERLAP")
+    model: str = Field(default="claude-sonnet-4-20250514", alias="MODEL")
+    embedding_model: str = Field(default="all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")
+    top_k: int = Field(default=5, alias="TOP_K")
+
+    class Config:
+        env_file = ".env"
 
 
-class Config:
-    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-    CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")
-    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
-    CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
-    MODEL = os.getenv("MODEL", "claude-sonnet-4-20250514")
-    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-    TOP_K = int(os.getenv("TOP_K", "5"))
+settings = Config()
