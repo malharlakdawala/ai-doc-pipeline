@@ -1,9 +1,11 @@
 """Document ingestion and parsing module."""
 
 import os
+import logging
 from pathlib import Path
 from pypdf import PdfReader
-from typing import Generator
+
+logger = logging.getLogger(__name__)
 
 
 class Document:
@@ -27,9 +29,16 @@ class Ingester:
 
     def ingest_directory(self, directory: str) -> list[Document]:
         docs = []
-        for path in Path(directory).rglob("*"):
+        dir_path = Path(directory)
+        if not dir_path.exists():
+            raise FileNotFoundError(f"Directory not found: {directory}")
+
+        for path in sorted(dir_path.rglob("*")):
             if path.suffix.lower() in self.SUPPORTED_EXTENSIONS:
-                docs.extend(self.ingest_file(str(path)))
+                try:
+                    docs.extend(self.ingest_file(str(path)))
+                except Exception as e:
+                    logger.warning(f"Failed to parse {path}: {e}")
         return docs
 
     def ingest_file(self, file_path: str) -> list[Document]:
@@ -43,15 +52,27 @@ class Ingester:
         reader = PdfReader(file_path)
         docs = []
         for i, page in enumerate(reader.pages):
-            text = page.extract_text()
+            try:
+                text = page.extract_text()
+            except Exception as e:
+                logger.warning(f"Failed to extract text from page {i+1} of {file_path}: {e}")
+                continue
             if text and text.strip():
+                # Clean up common PDF artifacts
+                text = text.replace("\x00", "").replace("\ufffd", "")
                 docs.append(Document(
                     content=text,
-                    metadata={"source": file_path, "page": i + 1}
+                    metadata={"source": file_path, "page": i + 1, "total_pages": len(reader.pages)}
                 ))
         return docs
 
     def _parse_text(self, file_path: str) -> list[Document]:
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        return [Document(content=content, metadata={"source": file_path})]
+        encodings = ["utf-8", "latin-1", "cp1252"]
+        for encoding in encodings:
+            try:
+                with open(file_path, "r", encoding=encoding) as f:
+                    content = f.read()
+                return [Document(content=content, metadata={"source": file_path})]
+            except UnicodeDecodeError:
+                continue
+        raise ValueError(f"Could not decode file: {file_path}")
