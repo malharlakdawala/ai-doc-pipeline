@@ -1,6 +1,7 @@
 """Document ingestion and parsing module."""
 
 import os
+import csv
 import logging
 from pathlib import Path
 from pypdf import PdfReader
@@ -18,13 +19,14 @@ class Document:
 
 
 class Ingester:
-    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".csv"}
 
     def __init__(self):
         self._parsers = {
             ".pdf": self._parse_pdf,
             ".txt": self._parse_text,
             ".md": self._parse_text,
+            ".csv": self._parse_csv,
         }
 
     def ingest_directory(self, directory: str) -> list[Document]:
@@ -55,24 +57,29 @@ class Ingester:
             try:
                 text = page.extract_text()
             except Exception as e:
-                logger.warning(f"Failed to extract text from page {i+1} of {file_path}: {e}")
+                logger.warning(f"Failed to extract page {i+1} of {file_path}: {e}")
                 continue
             if text and text.strip():
-                # Clean up common PDF artifacts
                 text = text.replace("\x00", "").replace("\ufffd", "")
-                docs.append(Document(
-                    content=text,
-                    metadata={"source": file_path, "page": i + 1, "total_pages": len(reader.pages)}
-                ))
+                docs.append(Document(content=text, metadata={"source": file_path, "page": i + 1}))
         return docs
 
     def _parse_text(self, file_path: str) -> list[Document]:
         encodings = ["utf-8", "latin-1", "cp1252"]
-        for encoding in encodings:
+        for enc in encodings:
             try:
-                with open(file_path, "r", encoding=encoding) as f:
+                with open(file_path, "r", encoding=enc) as f:
                     content = f.read()
                 return [Document(content=content, metadata={"source": file_path})]
             except UnicodeDecodeError:
                 continue
-        raise ValueError(f"Could not decode file: {file_path}")
+        raise ValueError(f"Could not decode: {file_path}")
+
+    def _parse_csv(self, file_path: str) -> list[Document]:
+        docs = []
+        with open(file_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for i, row in enumerate(reader):
+                text = " | ".join(f"{k}: {v}" for k, v in row.items() if v)
+                docs.append(Document(content=text, metadata={"source": file_path, "row": i + 1}))
+        return docs
