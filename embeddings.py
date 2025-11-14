@@ -6,10 +6,13 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_BATCH_SIZE = 64
+
 
 class EmbeddingGenerator:
-    def __init__(self, model_name: str | None = None):
+    def __init__(self, model_name: str | None = None, batch_size: int = DEFAULT_BATCH_SIZE):
         self.model_name = model_name or settings.embedding_model
+        self.batch_size = batch_size
         self._model = None
         self._dimension = None
 
@@ -29,7 +32,12 @@ class EmbeddingGenerator:
         return self._dimension
 
     def generate(self, texts: list[str]) -> list[list[float]]:
-        embeddings = self.model.encode(texts, show_progress_bar=True, normalize_embeddings=True)
+        embeddings = self.model.encode(
+            texts,
+            show_progress_bar=len(texts) > 50,
+            batch_size=self.batch_size,
+            normalize_embeddings=True,
+        )
         return embeddings.tolist()
 
     def generate_single(self, text: str) -> list[float]:
